@@ -88,12 +88,8 @@ public class StripesPMI extends Configured implements Tool {
         sum += iter.next().get();
       }
 
-      Configuration conf = context.getConfiguration();
-      int threshold = conf.getInt("threshold", 0);
-      if (sum >= threshold) {
-        SUM.set(sum);
-        context.write(key, SUM);
-      }
+      SUM.set(sum);
+      context.write(key, SUM);
     }
   }
 
