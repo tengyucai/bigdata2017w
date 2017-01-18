@@ -146,7 +146,7 @@ public class PairsPMI extends Configured implements Tool {
       for (int i = 0; i < 5; i++) {
         Path sideDataPath = new Path("tmp/part-r-0000" + Integer.toString(i));
         FSDataInputStream is = fs.open(sideDataPath);
-        InputStreamReader isr = new InputStreamReader(is);
+        InputStreamReader isr = new InputStreamReader(is, "UTF-8"));
         BufferedReader br = new BufferedReader(isr);
         String line = br.readLine();
         while (line != null) {
@@ -229,7 +229,7 @@ public class PairsPMI extends Configured implements Tool {
     conf.set("sideDataPath", sideDataPath);
     conf.set("threshold", Integer.toString(args.threshold));
     Job job = Job.getInstance(conf);
-    job.setJobName(PairsPMI.class.getSimpleName() + "job1");
+    job.setJobName(PairsPMI.class.getSimpleName());
     job.setJarByClass(PairsPMI.class);
 
     job.setNumReduceTasks(args.numReducers);
@@ -260,7 +260,7 @@ public class PairsPMI extends Configured implements Tool {
     long count = job.getCounters().findCounter(MyMapper.MyCounter.LINE_COUNTER).getValue();
     conf.setLong("counter", count);
     Job secondJob = Job.getInstance(conf);
-    secondJob.setJobName(PairsPMI.class.getSimpleName() + "job2");
+    secondJob.setJobName(PairsPMI.class.getSimpleName());
     secondJob.setJarByClass(PairsPMI.class);
 
     secondJob.setNumReduceTasks(args.numReducers);

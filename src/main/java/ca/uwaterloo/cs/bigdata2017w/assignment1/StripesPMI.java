@@ -148,7 +148,7 @@ public class StripesPMI extends Configured implements Tool {
       for (int i = 0; i < 5; i++) {
         Path sideDataPath = new Path("tmp/part-r-0000" + Integer.toString(i));
         FSDataInputStream is = fs.open(sideDataPath);
-        InputStreamReader isr = new InputStreamReader(is);
+        InputStreamReader isr = new InputStreamReader(is, "UTF-8");
         BufferedReader br = new BufferedReader(isr);
         String line = br.readLine();
         while (line != null) {
