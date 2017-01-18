@@ -28,6 +28,7 @@ import org.kohsuke.args4j.ParserProperties;
 import tl.lin.data.pair.PairOfStrings;
 import tl.lin.data.pair.PairOfFloatInt;
 import tl.lin.data.map.HMapStIW;
+import tl.lin.data.map.HashMapWritable;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -41,6 +42,7 @@ import java.io.InputStreamReader;
 
 public class StripesPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(StripesPMI.class);
+  private static final int WORD_LIMIT = 40;
 
   public static final class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
     // Reuse objects to save overhead of object creation.
@@ -57,7 +59,7 @@ public class StripesPMI extends Configured implements Tool {
       for (String word : Tokenizer.tokenize(value.toString())) {
         set.add(word);
         numWords++;
-        if (numWords >= 40) break;
+        if (numWords >= WORD_LIMIT) break;
       }
 
       String[] words = new String[set.size()];
@@ -105,7 +107,7 @@ public class StripesPMI extends Configured implements Tool {
       for (String word : Tokenizer.tokenize(value.toString())) {
         set.add(word);
         numWords++;
-        if (numWords >= 40) break;
+        if (numWords >= WORD_LIMIT) break;
       }
 
       String[] words = new String[set.size()];
@@ -140,11 +142,11 @@ public class StripesPMI extends Configured implements Tool {
     }
   }
 
-  public static final class MySecondReducer extends Reducer<Text, HMapStIW, PairOfStrings, PairOfFloatInt> {
-    private static final PairOfStrings PAIR = new PairOfStrings();
-    private static final PairOfFloatInt PMI = new PairOfFloatInt();
+  public static final class MySecondReducer extends Reducer<Text, HMapStIW, Text, HashMapWritable> {
+    private static final Text KEY = new Text();
+    private static final HashMapWritable MAP = new HashMapWritable();
+    
     private static final Map<String, Integer> wordCount = new HashMap<String, Integer>();
-
     private static long numLines;
 
     @Override
@@ -153,10 +155,9 @@ public class StripesPMI extends Configured implements Tool {
       numLines = conf.getLong("counter", 0L);
 
       FileSystem fs = FileSystem.get(conf);
-      FileStatus[] status = fs.listStatus(new Path("tmp/"));
-      for (int i = 0; i < 5; i++) {
-        Path sideDataPath = new Path("tmp/part-r-0000" + Integer.toString(i));
-        FSDataInputStream is = fs.open(sideDataPath);
+      FileStatus[] status = fs.globStatus(new Path("tmp/part-r-*"));
+      for (FileStatus file : status) {
+        FSDataInputStream is = fs.open(file.getPath());
         InputStreamReader isr = new InputStreamReader(is, "UTF-8");
         BufferedReader br = new BufferedReader(isr);
         String line = br.readLine();
@@ -185,14 +186,19 @@ public class StripesPMI extends Configured implements Tool {
       int threshold = conf.getInt("threshold", 0);
 
       String left = key.toString();
+      KEY.set(left);
+      MAP.clear();
       for (String right : map.keySet()) {
         if (map.get(right) >= threshold) {
-          PAIR.set(left, right);
           int sum = map.get(right);
           float pmi = (float) Math.log10((double)(sum * numLines) / (double)(wordCount.get(left) * wordCount.get(right)));
-          PMI.set(pmi, sum);
-          context.write(PAIR, PMI);
+          PairOfFloatInt PMI_COUNT = new PairOfFloatInt();
+          PMI_COUNT.set(pmi, sum);
+          MAP.put(right, PMI_COUNT);
         }
+      }
+      if (MAP.size() > 0) {
+        context.write(KEY, MAP);
       }
     }
   }
@@ -285,8 +291,8 @@ public class StripesPMI extends Configured implements Tool {
 
     secondJob.setMapOutputKeyClass(Text.class);
     secondJob.setMapOutputValueClass(HMapStIW.class);
-    secondJob.setOutputKeyClass(PairOfStrings.class);
-    secondJob.setOutputValueClass(PairOfFloatInt.class);
+    secondJob.setOutputKeyClass(Text.class);
+    secondJob.setOutputValueClass(HashMapWritable.class);
     secondJob.setOutputFormatClass(TextOutputFormat.class);
 
     secondJob.setMapperClass(MySecondMapper.class);

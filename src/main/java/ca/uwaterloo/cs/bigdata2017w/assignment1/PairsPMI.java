@@ -40,6 +40,7 @@ import java.io.InputStreamReader;
 
 public class PairsPMI extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(PairsPMI.class);
+  private static final int WORD_LIMIT = 40;
 
   public static final class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
     // Reuse objects to save overhead of object creation.
@@ -56,7 +57,7 @@ public class PairsPMI extends Configured implements Tool {
       for (String word : Tokenizer.tokenize(value.toString())) {
         set.add(word);
         numWords++;
-        if (numWords >= 40) break;
+        if (numWords >= WORD_LIMIT) break;
       }
 
       String[] words = new String[set.size()];
@@ -104,7 +105,7 @@ public class PairsPMI extends Configured implements Tool {
       for (String word : Tokenizer.tokenize(value.toString())) {
         set.add(word);
         numWords++;
-        if (numWords >= 40) break;
+        if (numWords >= WORD_LIMIT) break;
       }
 
       String[] words = new String[set.size()];
@@ -151,10 +152,9 @@ public class PairsPMI extends Configured implements Tool {
       numLines = conf.getLong("counter", 0L);
 
       FileSystem fs = FileSystem.get(conf);
-      FileStatus[] status = fs.listStatus(new Path("tmp/"));
-      for (int i = 0; i < 5; i++) {
-        Path sideDataPath = new Path("tmp/part-r-0000" + Integer.toString(i));
-        FSDataInputStream is = fs.open(sideDataPath);
+      FileStatus[] status = fs.globStatus(new Path("tmp/part-r-*"));
+      for (FileStatus file : status) {
+        FSDataInputStream is = fs.open(file.getPath());
         InputStreamReader isr = new InputStreamReader(is, "UTF-8");
         BufferedReader br = new BufferedReader(isr);
         String line = br.readLine();
