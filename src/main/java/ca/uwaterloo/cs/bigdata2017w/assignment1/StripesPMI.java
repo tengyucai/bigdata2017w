@@ -27,6 +27,7 @@ import org.kohsuke.args4j.Option;
 import org.kohsuke.args4j.ParserProperties;
 import tl.lin.data.pair.PairOfStrings;
 import tl.lin.data.pair.PairOfFloatInt;
+import tl.lin.data.map.HMapStIW;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -38,8 +39,8 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
 
-public class PairsPMI extends Configured implements Tool {
-  private static final Logger LOG = Logger.getLogger(PairsPMI.class);
+public class StripesPMI extends Configured implements Tool {
+  private static final Logger LOG = Logger.getLogger(StripesPMI.class);
 
   public static final class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
     // Reuse objects to save overhead of object creation.
@@ -83,9 +84,9 @@ public class PairsPMI extends Configured implements Tool {
     }
   }
 
-  public static final class MySecondMapper extends Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
-    private static final IntWritable ONE = new IntWritable(1);
-    private static final PairOfStrings PAIR = new PairOfStrings();
+  public static final class MySecondMapper extends Mapper<LongWritable, Text, Text, HMapStIW> {
+    private static final HMapStIW MAP = new HMapStIW();
+    private static final Text KEY = new Text();
 
     @Override
     public void map(LongWritable key, Text value, Context context)
@@ -102,35 +103,36 @@ public class PairsPMI extends Configured implements Tool {
       words = set.toArray(words);
 
       for (int i = 0; i < words.length; i++) {
-        for (int j = i + 1; j < words.length; j++) {
-          PAIR.set(words[i], words[j]);
-          context.write(PAIR, ONE);
-          PAIR.set(words[j], words[i]);
-          context.write(PAIR, ONE);
+        MAP.clear();
+        for (int j = 0; j < words.length; j++) {
+          if (i == j) continue;
+          MAP.increment(words[j]);
         }
+
+        KEY.set(words[i]);
+        context.write(KEY, MAP);
       }
     }
   }
 
-  public static final class MySecondCombiner extends Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
-    private static final IntWritable SUM = new IntWritable();
+  public static final class MySecondCombiner extends Reducer<Text, HMapStIW, Text, HMapStIW> {
 
     @Override
-    public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+    public void reduce(Text key, Iterable<HMapStIW> values, Context context)
         throws IOException, InterruptedException {
-      Iterator<IntWritable> iter = values.iterator();
-      int sum = 0;
+      Iterator<HMapStIW> iter = values.iterator();
+      HMapStIW map = new HMapStIW();
+
       while (iter.hasNext()) {
-        sum += iter.next().get();
+        map.plus(iter.next());
       }
-      SUM.set(sum);
-      context.write(key, SUM);
+
+      context.write(key, map);
     }
   }
 
-  public static final class MySecondReducer extends Reducer<PairOfStrings, IntWritable, PairOfStrings, PairOfFloatInt> {
-    // private static final DoubleWritable PMI = new DoubleWritable();
-    // private static final DoubleWritable SUM = new DoubleWritable();
+  public static final class MySecondReducer extends Reducer<Text, HMapStIW, PairOfStrings, PairOfFloatInt> {
+    private static final PairOfStrings PAIR = new PairOfStrings();
     private static final PairOfFloatInt PMI = new PairOfFloatInt();
     private static final Map<String, Integer> wordCount = new HashMap<String, Integer>();
 
@@ -161,23 +163,27 @@ public class PairsPMI extends Configured implements Tool {
     }
 
     @Override
-    public void reduce(PairOfStrings key, Iterable<IntWritable> values, Context context)
+    public void reduce(Text key, Iterable<HMapStIW> values, Context context)
         throws IOException, InterruptedException {
-      int sum = 0;
-      for (IntWritable value : values) {
-        sum += value.get();
+      Iterator<HMapStIW> iter = values.iterator();
+      HMapStIW map = new HMapStIW();
+
+      while (iter.hasNext()) {
+        map.plus(iter.next());
       }
 
       Configuration conf = context.getConfiguration();
       int threshold = conf.getInt("threshold", 0);
 
-      if (sum >= threshold) {
-        String left = key.getLeftElement();
-        String right = key.getRightElement();
-
-        float pmi = (float) Math.log10((double)(sum * numLines) / (double)(wordCount.get(left) * wordCount.get(right)));
-        PMI.set(pmi, sum);
-        context.write(key, PMI);
+      String left = key.toString();
+      for (String right : map.keySet()) {
+        if (map.get(right) >= threshold) {
+          PAIR.set(left, right);
+          int sum = map.get(right);
+          float pmi = (float) Math.log10((double)(sum * numLines) / (double)(wordCount.get(left) * wordCount.get(right)));
+          PMI.set(pmi, sum);
+          context.write(PAIR, PMI);
+        }
       }
     }
   }
@@ -185,7 +191,7 @@ public class PairsPMI extends Configured implements Tool {
   /**
    * Creates an instance of this tool.
    */
-  private PairsPMI() {}
+  private StripesPMI() {}
 
   private static final class Args {
     @Option(name = "-input", metaVar = "[path]", required = true, usage = "input path")
@@ -219,7 +225,7 @@ public class PairsPMI extends Configured implements Tool {
       return -1;
     }
 
-    LOG.info("Tool: " + PairsPMI.class.getSimpleName());
+    LOG.info("Tool: " + StripesPMI.class.getSimpleName());
     LOG.info(" - input path: " + args.input);
     LOG.info(" - output path: " + args.output);
     LOG.info(" - number of reducers: " + args.numReducers);
@@ -229,8 +235,8 @@ public class PairsPMI extends Configured implements Tool {
     conf.set("sideDataPath", sideDataPath);
     conf.set("threshold", Integer.toString(args.threshold));
     Job job = Job.getInstance(conf);
-    job.setJobName(PairsPMI.class.getSimpleName() + "job1");
-    job.setJarByClass(PairsPMI.class);
+    job.setJobName(StripesPMI.class.getSimpleName());
+    job.setJarByClass(StripesPMI.class);
 
     job.setNumReduceTasks(args.numReducers);
 
@@ -260,16 +266,16 @@ public class PairsPMI extends Configured implements Tool {
     long count = job.getCounters().findCounter(MyMapper.MyCounter.LINE_COUNTER).getValue();
     conf.setLong("counter", count);
     Job secondJob = Job.getInstance(conf);
-    secondJob.setJobName(PairsPMI.class.getSimpleName() + "job2");
-    secondJob.setJarByClass(PairsPMI.class);
+    secondJob.setJobName(StripesPMI.class.getSimpleName());
+    secondJob.setJarByClass(StripesPMI.class);
 
     secondJob.setNumReduceTasks(args.numReducers);
 
     FileInputFormat.setInputPaths(secondJob, new Path(args.input));
     FileOutputFormat.setOutputPath(secondJob, new Path(args.output));
 
-    secondJob.setMapOutputKeyClass(PairOfStrings.class);
-    secondJob.setMapOutputValueClass(IntWritable.class);
+    secondJob.setMapOutputKeyClass(Text.class);
+    secondJob.setMapOutputValueClass(HMapStIW.class);
     secondJob.setOutputKeyClass(PairOfStrings.class);
     secondJob.setOutputValueClass(PairOfFloatInt.class);
     secondJob.setOutputFormatClass(TextOutputFormat.class);
@@ -293,6 +299,6 @@ public class PairsPMI extends Configured implements Tool {
    * Dispatches command-line arguments to the tool via the {@code ToolRunner}.
    */
   public static void main(String[] args) throws Exception {
-    ToolRunner.run(new PairsPMI(), args);
+    ToolRunner.run(new StripesPMI(), args);
   }
 }
