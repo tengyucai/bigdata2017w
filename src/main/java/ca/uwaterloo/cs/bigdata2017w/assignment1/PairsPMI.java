@@ -52,11 +52,19 @@ public class PairsPMI extends Configured implements Tool {
     public void map(LongWritable key, Text value, Context context)
         throws IOException, InterruptedException {
       int numWords = 0;
+      Set<String> set = new HashSet<String>();
       for (String word : Tokenizer.tokenize(value.toString())) {
-        WORD.set(word);
-        context.write(WORD, ONE);
+        set.add(word);
         numWords++;
         if (numWords >= 40) break;
+      }
+
+      String[] words = new String[set.size()];
+      words = set.toArray(words);
+
+      for (int i = 0; i < words.length; i++) {
+        WORD.set(words[i]);
+        context.write(WORD, ONE);
       }
 
       Counter counter = context.getCounter(MyCounter.LINE_COUNTER);
@@ -78,8 +86,13 @@ public class PairsPMI extends Configured implements Tool {
       while (iter.hasNext()) {
         sum += iter.next().get();
       }
-      SUM.set(sum);
-      context.write(key, SUM);
+
+      Configuration conf = context.getConfiguration();
+      int threshold = conf.getInt("threshold", 0);
+      if (sum >= threshold) {
+        SUM.set(sum);
+        context.write(key, SUM);
+      }
     }
   }
 
@@ -146,7 +159,7 @@ public class PairsPMI extends Configured implements Tool {
       for (int i = 0; i < 5; i++) {
         Path sideDataPath = new Path("tmp/part-r-0000" + Integer.toString(i));
         FSDataInputStream is = fs.open(sideDataPath);
-        InputStreamReader isr = new InputStreamReader(is, "UTF-8"));
+        InputStreamReader isr = new InputStreamReader(is, "UTF-8");
         BufferedReader br = new BufferedReader(isr);
         String line = br.readLine();
         while (line != null) {
