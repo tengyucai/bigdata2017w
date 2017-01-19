@@ -256,6 +256,12 @@ public class PairsPMI extends Configured implements Tool {
     job.setCombinerClass(MyReducer.class);
     job.setReducerClass(MyReducer.class);
 
+    job.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 32);
+    job.getConfiguration().set("mapreduce.map.memory.mb", "3072");
+    job.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
+    job.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
+    job.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
+
     // Delete the output directory if it exists already.
     Path outputDir = new Path(sideDataPath);
     FileSystem.get(conf).delete(outputDir, true);
@@ -282,6 +288,12 @@ public class PairsPMI extends Configured implements Tool {
     secondJob.setOutputKeyClass(PairOfStrings.class);
     secondJob.setOutputValueClass(PairOfFloatInt.class);
     secondJob.setOutputFormatClass(TextOutputFormat.class);
+
+    secondJob.getConfiguration().setInt("mapred.max.split.size", 1024 * 1024 * 32);
+    secondJob.getConfiguration().set("mapreduce.map.memory.mb", "3072");
+    secondJob.getConfiguration().set("mapreduce.map.java.opts", "-Xmx3072m");
+    secondJob.getConfiguration().set("mapreduce.reduce.memory.mb", "3072");
+    secondJob.getConfiguration().set("mapreduce.reduce.java.opts", "-Xmx3072m");
 
     secondJob.setMapperClass(MySecondMapper.class);
     secondJob.setCombinerClass(MySecondCombiner.class);
