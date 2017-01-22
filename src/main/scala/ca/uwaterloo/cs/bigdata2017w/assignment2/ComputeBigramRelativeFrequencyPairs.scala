@@ -6,6 +6,7 @@ import org.apache.log4j._
 import org.apache.hadoop.fs._
 import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
+import org.apache.spark.Partitioner
 import org.rogach.scallop._
 
 class Conf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
@@ -14,6 +15,14 @@ class Conf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
   val output = opt[String](descr = "output path", required = true)
   val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
   verify()
+}
+
+class MyPartitioner(numParts: Int) extends Partitioner {
+  override def numPartitions: Int = numParts
+  override def getPartition(key: Any): Int = key match {
+     case (left, right) => (left.hashCode() & Integer.MAX_VALUE) % numParts
+     case _ => 0
+  }
 }
 
 object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
@@ -36,10 +45,28 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
     val counts = textFile
       .flatMap(line => {
         val tokens = tokenize(line)
-        if (tokens.length > 1) tokens.sliding(2).map(p => p.mkString(" ")).toList else List()
+        if (tokens.length > 1) {
+          val bigram = tokens.sliding(2).map(p => (p.head, p.last)).toList
+          val bigramMarginal = tokens.init.map(w => (w, "*")).toList
+          bigram ++ bigramMarginal
+        } else List()
       })
       .map(bigram => (bigram, 1))
       .reduceByKey(_ + _)
+      .sortByKey()
+      .repartitionAndSortWithinPartitions(new MyPartitioner(args.reducers()))
+      .mapPartitions(tmp => {
+        var marginal = 0.0f
+        tmp.map(bi => {
+          bi._1 match {
+            case (_, "*") => {
+              marginal = bi._2
+              (bi._1, bi._2)
+            }
+            case (_, _) => (bi._1, bi._2 / marginal)
+          }
+        })
+      })
     counts.saveAsTextFile(args.output())
   }
 }
