@@ -8,7 +8,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.rogach.scallop._
 
-object PairsPMI extends Tokenizer {
+object StripesPMI extends Tokenizer {
   val log = Logger.getLogger(getClass().getName())
 
   def main(argv: Array[String]) {
@@ -18,7 +18,7 @@ object PairsPMI extends Tokenizer {
     log.info("Output: " + args.output())
     log.info("Number of reducers: " + args.reducers())
 
-    val conf = new SparkConf().setAppName("Pairs PMI")
+    val conf = new SparkConf().setAppName("Stripes PMI")
     val sc = new SparkContext(conf)
 
     val outputDir = new Path(args.output())
