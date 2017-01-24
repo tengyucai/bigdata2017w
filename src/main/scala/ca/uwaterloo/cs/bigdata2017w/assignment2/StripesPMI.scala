@@ -42,28 +42,47 @@ object StripesPMI extends Tokenizer {
         val tokens = tokenize(line)
         val words = tokens.take(Math.min(tokens.length, 40)).distinct
         if (words.length > 1) {
-          var pairs = scala.collection.mutable.ListBuffer[(String, String)]()
+          var stripes = scala.collection.mutable.ListBuffer[(String, Map[String, Int])]()
           var i = 0
           var j = 0
           for (i <- 0 to words.length - 1) {
+            var map = scala.collection.mutable.Map[String, Int]()
             for (j <- 0 to words.length - 1) {
               if ((i != j) && (words(i) != words(j))) {
-                var pair : (String, String) = (words(i), words(j))
-                pairs += pair
+                var count = map.getOrElse(words(j), 0) + 1
+                map(words(j)) = count
               }
             }
+            var stripe : (String, Map[String, Int]) = (words(i), map.toMap)
+            stripes += stripe
           }
-          pairs.toList
+          stripes.toList
         } else List()
       })
-      .map(pair => (pair, 1))
-      .reduceByKey(_ + _)
-      .map(p => {
-        var leftCount = broadcastVar.value(p._1._1)
-        var rightCount = broadcastVar.value(p._1._2)
-        var pmi = Math.log10((p._2.toFloat * lineNumber.toFloat) / (leftCount * rightCount))
-        (p._1, (pmi, p._2.toInt))
+      // .map(pair => (pair, 1))
+      .reduceByKey((stripe1, stripe2) => {
+        stripe1 ++ stripe2.map{ case (k, v) => k -> (v + stripe1.getOrElse(k, 0)) }
       })
+      .map(stripe => {
+        val x = stripe._1
+        // for ((k, v) <- stripe._2) {
+        //   var pmi = Math.log10((v.toFloat * lineNumber.toFloat) / (broadcastVar.value(x) * broadcastVar.value(k)))
+        //   log.info(pmi)
+        // }
+        // val sum = stripe._2.foldLeft(0.0)(_+_._2)
+        // stripe._2.map { case (k, v) => {
+        //   k -> Math.log10((v.toFloat * lineNumber.toFloat) / (broadcastVar.value(x) * broadcastVar.value(k)))
+        //   // log.info(pmi)
+        // }
+        // var xCount = broadcastVar.value(p._1._1)
+        // var yCount = broadcastVar.value(p._1._2)
+        // var pmi = Math.log10((p._2.toFloat * lineNumber.toFloat) / (leftCount * rightCount))
+        // (p._1, (pmi, p._2.toInt))
+        (stripe._1, stripe._2.filter((m) => m._2 >= 10).map { case (k, v) => {
+          k -> (Math.log10((v.toFloat * lineNumber.toFloat) / (broadcastVar.value(x) * broadcastVar.value(k))), v)
+        }})
+      })
+      .filter((p) => p._2.size > 0)
       .saveAsTextFile(args.output())
   }
 }
