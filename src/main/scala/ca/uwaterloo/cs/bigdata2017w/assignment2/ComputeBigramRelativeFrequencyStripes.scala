@@ -8,11 +8,21 @@ import org.apache.spark.SparkContext
 import org.apache.spark.SparkConf
 import org.rogach.scallop._
 
+class BigramStripesConf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
+  mainOptions = Seq(input, output, reducers)
+  val input = opt[String](descr = "input path", required = true)
+  val output = opt[String](descr = "output path", required = true)
+  val reducers = opt[Int](descr = "number of reducers", required = false, default = Some(1))
+  val numExecutors = opt[Int](descr = "number of executors", required = false, default = Some(1))
+  val executorCores = opt[Int](descr = "number of cores", required = false, default = Some(1))
+  verify()
+}
+
 object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
   val log = Logger.getLogger(getClass().getName())
 
   def main(argv: Array[String]) {
-    val args = new Conf(argv)
+    val args = new BigramStripesConf(argv)
 
     log.info("Input: " + args.input())
     log.info("Output: " + args.output())
@@ -39,8 +49,9 @@ object ComputeBigramRelativeFrequencyStripes extends Tokenizer {
       })
       .map(stripe => {
         val sum = stripe._2.foldLeft(0.0)(_+_._2)
-        (stripe._1, stripe._2 map {case (k, v) => (k, v / sum)})
+        (stripe._1, stripe._2 map {case (k, v) => k + "=" + (v / sum)})
       })
+      .map(p => p._1 + " {" + (p._2 mkString ", ") + "}")
       .saveAsTextFile(args.output())
   }
 }

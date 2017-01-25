@@ -9,7 +9,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.Partitioner
 import org.rogach.scallop._
 
-class Conf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
+class BigramPairsConf(args: Seq[String]) extends ScallopConf(args) with Tokenizer {
   mainOptions = Seq(input, output, reducers)
   val input = opt[String](descr = "input path", required = true)
   val output = opt[String](descr = "output path", required = true)
@@ -31,7 +31,7 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
   val log = Logger.getLogger(getClass().getName())
 
   def main(argv: Array[String]) {
-    val args = new Conf(argv)
+    val args = new BigramPairsConf(argv)
 
     log.info("Input: " + args.input())
     log.info("Output: " + args.output())
@@ -69,6 +69,7 @@ object ComputeBigramRelativeFrequencyPairs extends Tokenizer {
           }
         })
       })
+      .map(p => "(" + p._1._1 + ", " + p._1._2 + "), " + p._2)
       .saveAsTextFile(args.output())
   }
 }
