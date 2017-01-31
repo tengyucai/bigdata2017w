@@ -8,9 +8,11 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MapFileOutputFormat;
@@ -30,6 +32,8 @@ import tl.lin.data.pair.PairOfWritables;
 import tl.lin.data.pair.PairOfStringInt;
 
 import java.io.IOException;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -38,7 +42,6 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
   private static final Logger LOG = Logger.getLogger(BuildInvertedIndexCompressed.class);
 
   private static final class MyMapper extends Mapper<LongWritable, Text, PairOfStringInt, IntWritable> {
-    // private static final Text WORD = new Text();
     private static final Object2IntFrequencyDistribution<String> COUNTS =
         new Object2IntFrequencyDistributionEntry<>();
     private static final PairOfStringInt PAIR = new PairOfStringInt();
@@ -59,7 +62,6 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
       for (PairOfObjectInt<String> e : COUNTS) {
         PAIR.set(e.getLeftElement().toString(), (int) docno.get());
         TF.set(e.getRightElement());
-        // WORD.set(e.getLeftElement());
         context.write(PAIR, TF);
       }
     }
@@ -74,33 +76,57 @@ public class BuildInvertedIndexCompressed extends Configured implements Tool {
 
   private static final class MyReducer extends
       Reducer<PairOfStringInt, IntWritable, Text, BytesWritable> {
-    private static final IntWritable DF = new IntWritable();
-
-    private static final Text TERM = new Text();
     private static final Text PREV_TERM = new Text();
+    private static ArrayListWritable<PairOfInts> POSTINGS = new ArrayListWritable<PairOfInts>();
+    private static final IntWritable PREV_DOCNO = new IntWritable();
+    private final static ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+    private final static DataOutputStream outStream = new DataOutputStream(byteStream);
 
     @Override
     public void setup(Context context) throws IOException, InterruptedException {
-      
+      PREV_TERM.set("");
     }
 
     @Override
     public void reduce(PairOfStringInt key, Iterable<IntWritable> values, Context context)
         throws IOException, InterruptedException {
-      Iterator<PairOfInts> iter = values.iterator();
-      ArrayListWritable<PairOfInts> postings = new ArrayListWritable<>();
+      Iterator<IntWritable> iter = values.iterator();
 
-      int df = 0;
-      while (iter.hasNext()) {
-        postings.add(iter.next().clone());
-        df++;
+      if (!key.getLeftElement().equals(PREV_TERM.toString()) && !PREV_TERM.toString().equals("")) {
+        for (PairOfInts pair : POSTINGS) {
+          WritableUtils.writeVInt(outStream, pair.getLeftElement());
+          WritableUtils.writeVInt(outStream, pair.getRightElement());
+        }
+        context.write(PREV_TERM, new BytesWritable(byteStream.toByteArray()));
+        byteStream.reset();
+        outStream.flush();
+        POSTINGS.clear();
+        PREV_DOCNO.set(0);
       }
 
-      // Sort the postings by docno ascending.
-      Collections.sort(postings);
+      int tf = 0;
+      while (iter.hasNext()) {
+        tf += iter.next().get();
+      }
+      POSTINGS.add(new PairOfInts(key.getRightElement() - (int)PREV_DOCNO.get(), tf));
+      PREV_TERM.set(key.getLeftElement());
+      PREV_DOCNO.set(key.getRightElement());
+    }
 
-      DF.set(df);
-      context.write(key, new PairOfWritables<>(DF, postings));
+    @Override
+    public void cleanup(Context context) throws IOException, InterruptedException {
+      for (PairOfInts pair : POSTINGS) {
+        WritableUtils.writeVInt(outStream, pair.getLeftElement());
+        WritableUtils.writeVInt(outStream, pair.getRightElement());
+      }
+      int prevDocno = (int)PREV_DOCNO.get();
+      if (prevDocno != 0) {
+        context.write(PREV_TERM, new BytesWritable(byteStream.toByteArray()));
+      }
+      byteStream.reset();
+      outStream.flush();
+      POSTINGS.clear();
+      PREV_DOCNO.set(0);
     }
   }
 
