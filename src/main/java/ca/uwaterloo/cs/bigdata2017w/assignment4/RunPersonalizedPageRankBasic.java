@@ -438,7 +438,8 @@ public class RunPersonalizedPageRankBasic extends Configured implements Tool {
     // Find out how much PageRank mass got lost at the dangling nodes.
     ArrayList<Float> missing = new ArrayList<Float>();
     for (int k = 0; k < mass.size(); k++) {
-      missing.add(1.0f - (float) StrictMath.exp(mass.get(k)));
+      float m = 1.0f - (float) StrictMath.exp(mass.get(k));
+      missing.add(m < 0.0f ? 0.0f : m);
     }
 
     // Job 2: distribute missing mass, take care of random jump factor.
