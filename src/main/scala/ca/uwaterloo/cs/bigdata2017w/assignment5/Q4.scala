@@ -50,7 +50,8 @@ object Q4 {
         })
         .reduceByKey(_ + _)
         .map(p => (p._1._1, (p._1._2, p._2)))
-        .sortByKey(true, 1)
+        .sortByKey()
+        .collect()
         .foreach(p => println(p._1, p._2._1, p._2._2))
     } else if (args.parquet()) {
       val sparkSession = SparkSession.builder.getOrCreate
@@ -91,7 +92,8 @@ object Q4 {
         })
         .reduceByKey(_ + _)
         .map(p => (p._1._1, (p._1._2, p._2)))
-        .sortByKey(true, 1)
+        .sortByKey()
+        .collect()
         .foreach(p => println(p._1, p._2._1, p._2._2))
     }
 	}
