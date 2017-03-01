@@ -14,22 +14,22 @@ object Q2 {
 		log.info("Input: " + args.input())
 		log.info("Date: " + args.date())
 
-  		val conf = new SparkConf().setAppName("Q2")
-  		val sc = new SparkContext(conf)
+		val conf = new SparkConf().setAppName("Q2")
+		val sc = new SparkContext(conf)
 
-  		val date = args.date()
+		val date = args.date()
 
-  		val orders = sc.textFile(args.input() + "/orders.tbl")
-  			.map(line => (line.split("\\|")(0), line.split("\\|")(6)))
-  		
-  		val lineitem = sc.textFile(args.input() + "/lineitem.tbl")
-  			.map(line => (line.split("\\|")(0), line.split("\\|")(10)))
-  			.filter(_._2.contains(date))
-  			.cogroup(orders)
-  			.filter(_._2._1.size != 0)
-  			.sortByKey()
-  			.take(20)
-  			.map(p => (p._2._2.head, p._1.toLong))
-  			.foreach(println)
+		val orders = sc.textFile(args.input() + "/orders.tbl")
+			.map(line => (line.split("\\|")(0), line.split("\\|")(6)))
+		
+		val lineitem = sc.textFile(args.input() + "/lineitem.tbl")
+			.map(line => (line.split("\\|")(0), line.split("\\|")(10)))
+			.filter(_._2.contains(date))
+			.cogroup(orders)
+			.filter(_._2._1.size != 0)
+			.sortByKey()
+			.take(20)
+			.map(p => (p._2._2.head, p._1.toLong))
+			.foreach(println)
 	}
 }
