@@ -28,9 +28,7 @@ object Q1 {
 		val sc = new SparkContext(conf)
 
 		val date = args.date()
-    val isText = args.text()
-    val isParquet = args.parquet()
-    if (isText) {
+    if (args.text()) {
       val textFile = sc.textFile(args.input() + "/lineitem.tbl")
       val count = textFile
       .map(line => line.split("\\|")(10))
@@ -38,7 +36,7 @@ object Q1 {
       .count
 
       println("ANSWER=" + count)
-    } else if (isParquet) {
+    } else if (args.parquet()) {
       val sparkSession = SparkSession.builder.getOrCreate
       val lineitemDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/lineitem")
       val lineitemRDD = lineitemDF.rdd
