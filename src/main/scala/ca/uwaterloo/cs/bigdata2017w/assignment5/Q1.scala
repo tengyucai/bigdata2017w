@@ -38,7 +38,7 @@ object Q1 {
       println("ANSWER=" + count)
     } else if (args.parquet()) {
       val sparkSession = SparkSession.builder.getOrCreate
-      val lineitemDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/lineitem")
+      val lineitemDF = sparkSession.read.parquet(args.input() + "/lineitem")
       val lineitemRDD = lineitemDF.rdd
   		val count = lineitemRDD
   			.map(line => line.getString(10))

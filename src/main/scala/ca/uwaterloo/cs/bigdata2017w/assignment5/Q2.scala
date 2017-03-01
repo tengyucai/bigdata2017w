@@ -35,12 +35,12 @@ object Q2 {
   			.foreach(println)
     } else if (args.parquet()) {
       val sparkSession = SparkSession.builder.getOrCreate
-      val ordersDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/orders")
+      val ordersDF = sparkSession.read.parquet(args.input() + "/orders")
       val ordersRDD = ordersDF.rdd
       val orders = ordersRDD
         .map(line => (line.getInt(0), line.getString(6)))
       
-      val lineitemDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/lineitem")
+      val lineitemDF = sparkSession.read.parquet(args.input() + "/lineitem")
       val lineitemRDD = lineitemDF.rdd
       val lineitem = lineitemRDD
         .map(line => (line.getInt(0), line.getString(10)))

@@ -45,19 +45,19 @@ object Q3 {
         .foreach(p => println(p._1, p._2._1, p._2._2))
     } else if (args.parquet()) {
       val sparkSession = SparkSession.builder.getOrCreate
-      val partDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/part")
+      val partDF = sparkSession.read.parquet(args.input() + "/part")
       val partRDD = partDF.rdd
       val part = partRDD
         .map(line => (line.getInt(0), line.getString(1)))
       val partBroadcast = sc.broadcast(part.collectAsMap())
 
-      val supplierDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/supplier")
+      val supplierDF = sparkSession.read.parquet(args.input() + "/supplier")
       val supplierRDD = supplierDF.rdd
       val supplier = supplierRDD
         .map(line => (line.getInt(0), line.getString(1)))
       val suppBroadcast = sc.broadcast(supplier.collectAsMap())
 
-      val lineitemDF = sparkSession.read.parquet("TPC-H-0.1-PARQUET/lineitem")
+      val lineitemDF = sparkSession.read.parquet(args.input() + "/lineitem")
       val lineitemRDD = lineitemDF.rdd
       val lineitem = lineitemRDD
         .filter(line => line.getString(10).contains(date))
