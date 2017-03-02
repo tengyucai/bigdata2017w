@@ -27,7 +27,7 @@ object Q7 {
 
       val orders = sc.textFile(args.input() + "/orders.tbl")
         .filter(line => {
-          (line.split("\\|")(4) < date) && (custBroadcast.value.contains(line.split("\\|")(0).toInt))
+          (line.split("\\|")(4) < date) && (custBroadcast.value.contains(line.split("\\|")(1).toInt))
         })
         .map(line => {
           val fields = line.split("\\|")
@@ -45,6 +45,7 @@ object Q7 {
           val revenue = fields(5).toDouble * (1 - fields(6).toDouble)
           (fields(0).toInt, revenue)
         })
+        .reduceByKey(_ + _)
         .cogroup(orders)
         .filter(p => p._2._1.size != 0 && p._2._2.size != 0)
         .map(p => {
@@ -71,7 +72,7 @@ object Q7 {
       val ordersRDD = ordersDF.rdd
       val orders = ordersRDD
         .filter(line => {
-          (line.getString(4) < date) && (custBroadcast.value.contains(line.getInt(0)))
+          (line.getString(4) < date) && (custBroadcast.value.contains(line.getInt(1)))
         })
         .map(line => {
           val orderKey = line.getInt(0)
@@ -89,6 +90,7 @@ object Q7 {
           val revenue = line.getDouble(5) * (1 - line.getDouble(6))
           (line.getInt(0), revenue)
         })
+        .reduceByKey(_ + _)
         .cogroup(orders)
         .filter(p => p._2._1.size != 0 && p._2._2.size != 0)
         .map(p => {
