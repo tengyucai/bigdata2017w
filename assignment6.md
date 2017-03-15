@@ -1,10 +1,10 @@
 Assignment 6
 ==================
 
-###Question 1.
-group_x: 1-ROCA%: 17.25
-group_y: 1-ROCA%: 12.82
-britney: 1-ROCA%: 16.28
+###Question 1.  
+group_x: 1-ROCA%: 17.25  
+group_y: 1-ROCA%: 12.82  
+britney: 1-ROCA%: 16.28  
 
 ###Question 2.
 1-ROCA%: 11.89
